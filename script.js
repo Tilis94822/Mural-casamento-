@@ -37,6 +37,8 @@ function lerFotos() {
 // ----- Seleção de várias fotos -----
 inputFoto.accept = 'image/*';
 inputFoto.multiple = true;
+inputFoto.required = false;
+inputFoto.removeAttribute('required');
 inputFoto.removeAttribute('capture');
 
 // A área antiga de prévia passa a mostrar uma lista de miniaturas.
