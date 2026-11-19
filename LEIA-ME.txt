@@ -1,0 +1,29 @@
+MURAL GLEICE E JULIO - VERSAO COM FILA OFFLINE
+
+ARQUIVOS DO SITE
+- index.html
+- style.css
+- script.js
+- service-worker.js
+- manifest.webmanifest
+- monograma-gj.jpg
+
+PUBLICACAO NO GITHUB PAGES
+1. Envie os arquivos do site para a raiz do mesmo repositorio GitHub Pages, substituindo os arquivos antigos.
+2. Mantenha todos esses arquivos juntos na mesma pasta.
+3. O site precisa estar publicado em HTTPS (GitHub Pages fornece HTTPS).
+4. Cada convidado deve abrir o site pelo menos uma vez com internet antes do casamento e aguardar a mensagem de modo offline preparado.
+5. No local sem internet, o convidado abre o site ja preparado, escolhe as fotos e envia. Elas ficam no armazenamento do navegador.
+6. Quando estiver em casa/com internet, precisa abrir o site novamente. O envio pendente sera retomado automaticamente.
+
+IMPORTANTE
+- Nao ha garantia de envio automatico com o navegador totalmente fechado. O navegador precisa abrir o site novamente com internet.
+- Nao limpar os dados/cache do navegador, nao desinstalar o navegador e nao usar aba anonima antes de concluir o envio.
+- O convidado deve manter os originais das fotos ate o site confirmar o envio.
+- O armazenamento depende do espaco livre e das regras do navegador/aparelho.
+- O mural continua privado: o site nao exibe fotos enviadas aos outros convidados.
+
+APPS SCRIPT
+O arquivo Code.gs e fornecido separadamente. Cole seu conteudo no projeto Apps Script que esta ligado a URL usada no script.js. Depois va em Implantar > Gerenciar implantações > Editar (lapis) > Nova versao > Implantar. Mantenha o acesso configurado para Qualquer pessoa, conforme a implantacao atual. Na primeira execucao, autorize o acesso ao Google Drive.
+
+A nova versao do Code.gs usa photoId para evitar criar uma segunda copia quando uma tentativa de envio chega ao Drive, mas a confirmacao nao retorna ao celular.

@@ -1,0 +1,11 @@
+{
+  "name": "Mural de lembranças - Gleice e Júlio",
+  "short_name": "Mural GJ",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f2eb",
+  "theme_color": "#f7f2eb",
+  "description": "Guarde suas fotos do casamento de Gleice e Júlio para enviar quando houver internet."
+}
