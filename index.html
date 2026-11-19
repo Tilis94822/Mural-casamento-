@@ -1,186 +1,89 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Gleice & Júlio | Nosso Casamento</title>
-
+  <meta name="theme-color" content="#f7f2eb">
+  <meta name="description" content="Compartilhe as lembranças do casamento de Gleice e Júlio.">
+  <title>Gleice & Júlio | Nosso mural de lembranças</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap" rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-  <nav class="navbar">
-    <ul>
-      <li><a href="#menu-casamento">Menu & Detalhes</a></li>
-      <li><a href="#mural-fotos">Mural de Fotos</a></li>
-    </ul>
-  </nav>
-
-  <header class="hero">
-    <h1>Gleice & Júlio</h1>
-    <p>Sejam bem-vindos ao nosso casamento!</p>
+  <header class="hero" id="inicio">
+    <div class="hero-glow"></div>
+    <img class="monograma" src="assets/monograma-gj.jpg" alt="Monograma GJ dos noivos Gleice e Júlio">
+    <p class="eyebrow">UM DIA PARA GUARDAR NO CORAÇÃO</p>
+    <h1>Gleice <span>&</span> Julio</h1>
+    <p class="hero-text">Cada momento fica ainda mais especial quando é compartilhado.</p>
+    <a class="hero-link" href="#mural">Compartilhe suas fotos <span aria-hidden="true">↓</span></a>
   </header>
 
   <main>
-
-    <section id="menu-casamento" class="card">
-      <h2>Menu do Casamento</h2>
-      <p class="subtitulo">Confira o que teremos em nossa celebração</p>
-
-      <div class="categoria-menu">
-        <h3>abc...</h3>
-        <ul>
-          <li>abc...</li>
-          <li>abc...</li>
-        </ul>
-      </div>
-
-      <div class="categoria-menu">
-        <h3>abc...</h3>
-        <ul>
-          <li>abc...</li>
-          <li>abc...</li>
-        </ul>
-      </div>
-
-      <div class="categoria-menu">
-        <h3>abc...</h3>
-        <ul>
-          <li>abc...</li>
-          <li>abc...</li>
-        </ul>
-      </div>
+    <section class="intro">
+      <span class="small-flower" aria-hidden="true">✳</span>
+      <p class="eyebrow">NOSSO DIA, SEUS OLHARES</p>
+      <h2>Vamos reviver esse dia juntos?</h2>
+      <p>Você também faz parte dessa história. Envie suas fotos e ajude a reunir aqui as lembranças desse momento tão especial.</p>
     </section>
 
-    <section id="mural-fotos" class="card">
-      <h2>Mural de Fotos & Mensagens</h2>
-
-      <p class="subtitulo">
-        Compartilhe suas lembranças e deixe um recado carinhoso!
-      </p>
-
+    <section class="upload-card" aria-labelledby="upload-title">
+      <div class="upload-icon" aria-hidden="true">♡</div>
+      <p class="eyebrow">COMPARTILHE UMA LEMBRANÇA</p>
+      <h2 id="upload-title">Sua foto merece fazer parte!</h2>
+      <p class="upload-description">Escolha várias fotos da galeria ou tire uma nova. Se quiser, deixe também uma mensagem para os noivos.</p>
       <form id="formFoto">
-
-        <input
-          type="text"
-          id="nomeConvidado"
-          class="campo-texto"
-          placeholder="Seu nome"
-          maxlength="40"
-          required
-          autocomplete="name"
-        >
-
-        <textarea
-          id="mensagemConvidado"
-          class="campo-texto"
-          placeholder="Escreva uma mensagem para os noivos..."
-          rows="3"
-          maxlength="180"
-        ></textarea>
-
-        <!-- SELETOR DA GALERIA -->
-        <input
-          type="file"
-          id="inputFoto"
-          accept="image/*"
-          multiple
-        >
-
-        <button
-          type="button"
-          id="btnGaleria"
-          class="btn-foto"
-        >
-          🖼️ Escolher fotos da galeria
-        </button>
-
-        <!-- SELETOR DA CÂMERA -->
-        <input
-          type="file"
-          id="cameraInput"
-          accept="image/*"
-          capture="environment"
-        >
-
-        <button
-          type="button"
-          id="btnCamera"
-          class="btn-foto"
-        >
-          📷 Tirar uma foto
-        </button>
-
-        <!-- PRÉ-VISUALIZAÇÃO -->
-        <div id="previewArea" hidden>
-          <h3>Fotos selecionadas</h3>
-
-          <p id="contadorFotos"></p>
-
-          <div id="listaPreviewsFotos"></div>
-
-          <button
-            type="button"
-            id="removerFoto"
-            class="btn-remover"
-          >
-            Remover todas as fotos
-          </button>
+        <label class="field-label" for="nomeConvidado">Seu nome</label>
+        <input id="nomeConvidado" name="nome" type="text" maxlength="40" placeholder="Como podemos te chamar?" required>
+        <label class="field-label" for="mensagemConvidado">Uma mensagem <span>(opcional)</span></label>
+        <textarea id="mensagemConvidado" name="mensagem" rows="3" maxlength="180" placeholder="Deixe um carinho para Gleice e Júlio..."></textarea>
+        <label class="file-picker" for="inputFoto">
+          <span class="camera-icon" aria-hidden="true">＋</span>
+          <span><strong>Escolher fotos da galeria</strong><small>Selecione várias imagens do celular</small></span>
+        </label>
+        <input id="inputFoto" type="file" accept="image/*" multiple>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" style="display:none">
+        <button type="button" id="btnCamera" class="submit-button" style="margin-top:10px;background:#a88470">📷 Tirar uma foto</button>
+        <div id="previewArea" class="preview-area" hidden>
+          <p id="contadorFotos" class="status"></p>
+          <div id="listaPreviewsFotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px"></div>
+          <button type="button" id="removerFoto" class="remove-photo">Remover todas as fotos</button>
         </div>
-
-        <p class="privacy-note">
-          As fotos serão enviadas em privado para Gleice e Júlio.
-        </p>
-
-        <button
-          type="submit"
-          id="btnEnviar"
-          class="btn-foto"
-        >
-          Enviar fotos ❤️
-        </button>
-
-        <p
-          id="statusEnvio"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-
+        <button class="submit-button" type="submit">Adicionar ao mural <span aria-hidden="true">♡</span></button>
+        <p class="privacy-note">As fotos serão enviadas em privado para Gleice e Júlio; outros convidados não poderão vê-las.</p>
+        <p id="statusEnvio" class="status" role="status" aria-live="polite"></p>
       </form>
-
-      <div id="mural" class="grid-mural">
-        <p id="mensagemVazia">
-          Suas lembranças são privadas. Somente os noivos terão acesso às fotos.
-        </p>
-      </div>
-
     </section>
 
+    <section class="gallery-section" id="mural">
+      <div class="section-heading">
+        <p class="eyebrow">PEQUENOS INSTANTES, GRANDES MEMÓRIAS</p>
+        <h2>Mural de lembranças</h2>
+        <p>As lembranças enviadas ficam privadas para os noivos.</p>
+      </div>
+      <div id="gradeFotos" class="photo-grid" aria-live="polite"><div class="empty-state" id="mensagemVazia"><span aria-hidden="true">✿</span><h3>Suas lembranças estão protegidas</h3><p>Somente Gleice e Júlio terão acesso às fotos enviadas.</p></div></div>
+    </section>
   </main>
 
-  <!-- MODAL MANTIDO PARA COMPATIBILIDADE COM O VISUAL ORIGINAL -->
-  <div id="modalFoto">
-    <button id="btnFecharModal" type="button">✕</button>
+  <footer>
+    <div class="footer-mark">G <span>♡</span> J</div>
+    <p>Com carinho, Gleice & Júlio</p>
+    <small>Obrigado por fazer parte da nossa história.</small>
+  </footer>
 
-    <div class="conteudo-modal">
-      <img id="imagemExpandida" src="" alt="Foto expandida">
-
-      <div class="info-modal">
-        <p id="autorExpandido" class="autor-modal"></p>
-        <p id="recadoExpandido" class="recado-modal"></p>
-      </div>
-    </div>
+  <div class="modal" id="modalFoto" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Foto ampliada">
+    <button type="button" class="modal-close" id="btnFecharModal" aria-label="Fechar">×</button>
+    <figure class="modal-content">
+      <img id="imagemExpandida" src="" alt="Foto ampliada do casamento">
+      <figcaption>
+        <strong id="autorExpandido"></strong>
+        <p id="recadoExpandido"></p>
+      </figcaption>
+    </figure>
   </div>
 
-  <script src="script.js?v=20261119"></script>
-
+  <script src="script.js?v=3"></script>
 </body>
 </html>
