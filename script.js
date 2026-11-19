@@ -2,8 +2,9 @@
 (() => {
   'use strict';
 
-  // CONFIGURAÇÃO
-  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5mLQhSGBeSvz6Ad6VPHaE0tFM75saawEB4QDqdki--CXge0fwWZvYgCc8urU88ugF/exec';
+  // CONFIGURAÇÃO DO GOOGLE APPS SCRIPT
+  const WEB_APP_URL =
+    'https://script.google.com/macros/s/AKfycbx5mLQhSGBeSvz6Ad6VPHaE0tFM75saawEB4QDqdki--CXge0fwWZvYgCc8urU88ugF/exec';
 
   const MAX_FILES = 50;
   const BATCH_SIZE = 5;
@@ -15,19 +16,30 @@
 
   const form = $('formFoto');
   const galleryInput = $('inputFoto');
+  const cameraInput = $('cameraInput');
+
+  const galleryButton = $('btnGaleria');
+  const cameraButton = $('btnCamera');
+  const submitButton = $('btnEnviar');
+
   const nameInput = $('nomeConvidado');
   const messageInput = $('mensagemConvidado');
+
   const previewArea = $('previewArea');
+  const previewList = $('listaPreviewsFotos');
+  const counter = $('contadorFotos');
   const clearButton = $('removerFoto');
   const status = $('statusEnvio');
-  const mural = $('gradeFotos');
 
   if (
-    !form || !galleryInput || !nameInput ||
+    !form || !galleryInput || !cameraInput ||
+    !galleryButton || !cameraButton ||
+    !submitButton || !nameInput ||
     !messageInput || !previewArea ||
-    !clearButton || !status || !mural
+    !previewList || !counter ||
+    !clearButton || !status
   ) {
-    console.error('Não foi possível localizar todos os elementos do HTML.');
+    console.error('Erro: elementos necessários não encontrados no HTML.');
     return;
   }
 
@@ -35,122 +47,69 @@
   let previewUrls = [];
   let uploading = false;
 
-  // CONFIGURAÇÃO DA GALERIA
-  // Este campo permite escolher várias imagens.
-  // Não usamos capture neste campo para não forçar a câmera.
+  // ==================================================
+  // CONFIGURAÇÃO DOS SELETORES
+  // ==================================================
+
+  // GALERIA: múltiplas imagens e SEM capture.
   galleryInput.type = 'file';
   galleryInput.accept = 'image/*';
   galleryInput.multiple = true;
   galleryInput.removeAttribute('capture');
   galleryInput.removeAttribute('required');
 
-  // A galeria não exibe fotos de outros convidados.
-  mural.innerHTML = `
-    <div class="empty-state">
-      <h3>Suas lembranças são privadas</h3>
-      <p>Somente Gleice e Júlio terão acesso às fotos enviadas.</p>
-    </div>
-  `;
+  // CÂMERA: apenas uma foto por vez.
+  cameraInput.type = 'file';
+  cameraInput.accept = 'image/*';
+  cameraInput.setAttribute('capture', 'environment');
+  cameraInput.multiple = false;
 
-  const privacyNote = form.querySelector('.privacy-note');
+  // ==================================================
+  // ABRIR GALERIA
+  // ==================================================
 
-  if (privacyNote) {
-    privacyNote.textContent =
-      'As fotos serão enviadas em privado para Gleice e Júlio.';
-  }
+  galleryButton.addEventListener('click', () => {
+    if (uploading) return;
 
-  // ELEMENTOS DA PRÉ-VISUALIZAÇÃO
-  let previewList = $('listaPreviewsFotos');
-
-  if (!previewList) {
-    previewList = document.createElement('div');
-    previewList.id = 'listaPreviewsFotos';
-    previewList.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
-      gap: 10px;
-      width: 100%;
-      margin-top: 12px;
-    `;
-    previewArea.appendChild(previewList);
-  }
-
-  let counter = $('contadorFotos');
-
-  if (!counter) {
-    counter = document.createElement('p');
-    counter.id = 'contadorFotos';
-    counter.className = 'status';
-    previewArea.appendChild(counter);
-  }
-
-  // BOTÃO EXCLUSIVO PARA A CÂMERA
-  // Ele é independente do seletor da galeria.
-  let cameraInput = $('cameraInputGJ');
-
-  if (!cameraInput) {
-    cameraInput = document.createElement('input');
-    cameraInput.id = 'cameraInputGJ';
-    cameraInput.type = 'file';
-    cameraInput.accept = 'image/*';
-    cameraInput.setAttribute('capture', 'environment');
-    cameraInput.hidden = true;
-    form.appendChild(cameraInput);
-  }
-
-  let cameraButton = $('cameraButtonGJ');
-
-  if (!cameraButton) {
-    cameraButton = document.createElement('button');
-    cameraButton.id = 'cameraButtonGJ';
-    cameraButton.type = 'button';
-    cameraButton.textContent = 'Tirar uma foto';
-    cameraButton.style.cssText = `
-      display: block;
-      margin: 12px 0;
-      padding: 10px 16px;
-      cursor: pointer;
-    `;
-
-    const galleryLabel = form.querySelector('label[for="inputFoto"]');
-
-    if (galleryLabel) {
-      galleryLabel.insertAdjacentElement('afterend', cameraButton);
-    } else {
-      galleryInput.insertAdjacentElement('afterend', cameraButton);
-    }
-  }
-
-  // BOTÃO DA GALERIA
-  const galleryLabel = form.querySelector('label[for="inputFoto"]');
-
-  if (galleryLabel) {
-    galleryLabel.textContent = 'Escolher fotos da galeria';
-    galleryLabel.style.cursor = 'pointer';
-  }
-
-  // BOTÃO DE CÂMERA
-  cameraButton.addEventListener('click', () => {
-    if (!uploading) {
-      cameraInput.click();
-    }
+    // Abre diretamente o seletor associado ao campo da galeria.
+    galleryInput.click();
   });
 
-  // MENSAGENS
+  // ==================================================
+  // ABRIR CÂMERA
+  // ==================================================
+
+  cameraButton.addEventListener('click', () => {
+    if (uploading) return;
+
+    cameraInput.click();
+  });
+
+  // ==================================================
+  // MENSAGENS DE STATUS
+  // ==================================================
+
   function setStatus(message, error = false) {
     status.textContent = message;
     status.style.color = error ? '#b33b32' : '';
   }
 
-  // LIMPEZA DAS PRÉVIAS
+  // ==================================================
+  // LIMPAR PRÉVIAS
+  // ==================================================
+
   function clearPreviewUrls() {
     previewUrls.forEach(url => URL.revokeObjectURL(url));
     previewUrls = [];
   }
 
-  // ATUALIZAÇÃO DAS PRÉVIAS
+  // ==================================================
+  // MOSTRAR FOTOS SELECIONADAS
+  // ==================================================
+
   function renderPreviews() {
     clearPreviewUrls();
+
     previewList.innerHTML = '';
 
     previewArea.hidden = selectedFiles.length === 0;
@@ -163,53 +122,50 @@
       previewUrls.push(url);
 
       const card = document.createElement('div');
+      card.className = 'card-foto';
 
       const image = document.createElement('img');
       image.src = url;
-      image.alt = `Prévia da foto ${index + 1}`;
+      image.alt = `Foto selecionada ${index + 1}`;
 
-      image.style.cssText = `
-        width: 100%;
-        height: 85px;
-        object-fit: cover;
-        border-radius: 8px;
-        display: block;
-      `;
+      const label = document.createElement('p');
+      label.textContent = `Foto ${index + 1}`;
+      label.className = 'autor';
 
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Remover';
-      remove.style.cssText = `
-        width: 100%;
-        margin-top: 5px;
-        padding: 5px;
-        font-size: 12px;
-        cursor: pointer;
-      `;
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.textContent = 'Remover';
 
-      remove.addEventListener('click', () => {
+      removeButton.addEventListener('click', () => {
         if (uploading) return;
 
         selectedFiles.splice(index, 1);
+
         renderPreviews();
         setStatus('Foto removida da seleção.');
       });
 
       card.appendChild(image);
-      card.appendChild(remove);
+      card.appendChild(label);
+      card.appendChild(removeButton);
+
       previewList.appendChild(card);
     });
   }
 
-  // ADICIONAR FOTOS À SELEÇÃO
+  // ==================================================
+  // ADICIONAR FOTOS
+  // ==================================================
+
   function addFiles(fileList) {
     if (uploading) return;
 
-    const incoming = Array.from(fileList || []);
-    let rejected = 0;
-    let added = 0;
+    const files = Array.from(fileList || []);
 
-    for (const file of incoming) {
+    let added = 0;
+    let rejected = 0;
+
+    for (const file of files) {
       if (!file.type.startsWith('image/')) {
         rejected++;
         continue;
@@ -233,42 +189,54 @@
 
     if (rejected > 0) {
       setStatus(
-        `${added} foto(s) adicionada(s). Alguns arquivos foram ignorados. Limite: 50 fotos e 15 MB por foto.`,
+        `${added} foto(s) adicionadas. Alguns arquivos foram ignorados. Limite: 50 fotos e 15 MB por foto.`,
         true
       );
     } else if (added > 0) {
-      setStatus('Fotos adicionadas! Você pode escolher mais ou tirar uma foto.');
+      setStatus(
+        `${added} foto(s) adicionadas. Você pode escolher mais fotos ou tirar uma foto.`
+      );
     }
   }
 
-  // ESCOLHER VÁRIAS FOTOS DA GALERIA
+  // ==================================================
+  // RECEBER FOTOS DA GALERIA
+  // ==================================================
+
   galleryInput.addEventListener('change', () => {
     addFiles(galleryInput.files);
 
-    // Permite selecionar novamente uma imagem já escolhida.
+    // Permite escolher novamente os mesmos arquivos.
     galleryInput.value = '';
   });
 
-  // TIRAR UMA FOTO
+  // ==================================================
+  // RECEBER FOTOS DA CÂMERA
+  // ==================================================
+
   cameraInput.addEventListener('change', () => {
     addFiles(cameraInput.files);
     cameraInput.value = '';
   });
 
+  // ==================================================
   // REMOVER TODAS AS FOTOS
-  clearButton.textContent = 'Remover todas as fotos';
+  // ==================================================
 
-  clearButton.addEventListener('click', event => {
-    event.preventDefault();
-
+  clearButton.addEventListener('click', () => {
     if (uploading) return;
 
     selectedFiles = [];
+
     renderPreviews();
-    setStatus('Todas as fotos foram removidas da seleção.');
+
+    setStatus('Todas as fotos foram removidas.');
   });
 
+  // ==================================================
   // COMPACTAR IMAGEM
+  // ==================================================
+
   async function compressImage(file) {
     let image;
     let width;
@@ -277,6 +245,7 @@
 
     if ('createImageBitmap' in window) {
       image = await createImageBitmap(file);
+
       width = image.width;
       height = image.height;
 
@@ -290,7 +259,9 @@
         const img = new Image();
 
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Não foi possível abrir uma imagem.'));
+        img.onerror = () => reject(
+          new Error('Não foi possível abrir uma imagem.')
+        );
 
         img.src = url;
       });
@@ -320,12 +291,20 @@
 
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      context.drawImage(
+        image,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
 
       let quality = 0.78;
-      let blob = await new Promise(resolve =>
-        canvas.toBlob(resolve, 'image/jpeg', quality)
-      );
+
+      let blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/jpeg', quality);
+      });
 
       while (
         blob &&
@@ -334,16 +313,19 @@
       ) {
         quality -= 0.08;
 
-        blob = await new Promise(resolve =>
-          canvas.toBlob(resolve, 'image/jpeg', quality)
-        );
+        blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', quality);
+        });
       }
 
       if (!blob || blob.size > MAX_COMPRESSED_SIZE) {
-        throw new Error('Uma foto ficou grande demais mesmo após a compressão.');
+        throw new Error(
+          'Uma foto não pôde ser reduzida para menos de 2 MB.'
+        );
       }
 
       return blob;
+
     } finally {
       canvas.width = 1;
       canvas.height = 1;
@@ -351,7 +333,10 @@
     }
   }
 
+  // ==================================================
   // CONVERTER IMAGEM PARA BASE64
+  // ==================================================
+
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -362,31 +347,229 @@
       };
 
       reader.onerror = () => {
-        reject(new Error('Erro ao preparar a imagem para envio.'));
+        reject(new Error('Falha ao preparar uma foto.'));
       };
 
       reader.readAsDataURL(blob);
     });
   }
 
-  // ENVIAR UM LOTE AO GOOGLE APPS SCRIPT
+  // ==================================================
+  // ENVIAR LOTE AO GOOGLE DRIVE
+  // ==================================================
+
   function sendBatch(payload) {
     return new Promise((resolve, reject) => {
       const frameName =
-        'gj_upload_' + Date.now() + '_' +
+        'gj_frame_' + Date.now() + '_' +
         Math.random().toString(36).slice(2);
 
       const frame = document.createElement('iframe');
+
       frame.name = frameName;
       frame.style.display = 'none';
 
       const transport = document.createElement('form');
+
       transport.method = 'POST';
       transport.action = WEB_APP_URL;
       transport.target = frameName;
       transport.style.display = 'none';
 
       const field = document.createElement('input');
+
+      field.type = 'hidden';
+      field.name = 'payload';
+      field.value = JSON.stringify(payload);
+
+      transport.appendChild(field);
+
+      document.body.appendChild(frame);
+      document.body.appendChild(transport);
+
+      let finished = false;
+
+      const onMessage = event => {
+        if (event.source !== frame.contentWindow) return;
+
+        if (
+          !event.data ||
+          event.data.type !== 'gj-upload-result'
+        ) {
+          return;
+        }
+
+        const result = event.data.result;
+
+        if (result && result.ok) {
+          finish(null, result);
+        } else {
+          finish(
+            new Error(
+              result && result.error
+                ? result.error
+                : 'O Google Drive não confirmou o envio.'
+            )
+          );
+        }
+      };
+
+      const timeout = setTimeout(() => {
+        finish(
+          new Error(
+            'Tempo de espera esgotado. Verifique o Apps Script.'
+          )
+        );
+      }, 90000);
+
+      function finish(error, result) {
+        if (finished) return;
+
+        finished = true;
+
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timeout);
+
+        transport.remove();
+        frame.remove();
+
+        if (error) reject(error);
+        else resolve(result);
+      }
+
+      window.addEventListener('message', onMessage);
+
+      try {
+        transport.submit();
+      } catch (error) {
+        finish(error);
+      }
+    });
+  }
+
+  // ==================================================
+  // ENVIAR FORMULÁRIO
+  // ==================================================
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    if (uploading) return;
+
+    const guestName = nameInput.value.trim();
+    const message = messageInput.value.trim();
+
+    if (!guestName) {
+      setStatus('Digite seu nome antes de enviar.', true);
+      nameInput.focus();
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      setStatus('Escolha pelo menos uma foto.', true);
+      return;
+    }
+
+    uploading = true;
+
+    galleryButton.disabled = true;
+    cameraButton.disabled = true;
+    submitButton.disabled = true;
+    clearButton.disabled = true;
+
+    galleryInput.disabled = true;
+    cameraInput.disabled = true;
+
+    const total = selectedFiles.length;
+    let uploaded = 0;
+
+    try {
+      for (
+        let start = 0;
+        start < total;
+        start += BATCH_SIZE
+      ) {
+        const batch = selectedFiles.slice(
+          start,
+          start + BATCH_SIZE
+        );
+
+        const encodedFiles = [];
+
+        for (let i = 0; i < batch.length; i++) {
+          setStatus(
+            `Preparando foto ${start + i + 1} de ${total}...`
+          );
+
+          const compressed = await compressImage(batch[i]);
+
+          const base64 = await blobToBase64(compressed);
+
+          encodedFiles.push({
+            mimeType: 'image/jpeg',
+            base64: base64
+          });
+        }
+
+        setStatus(
+          `Enviando ${Math.min(start + batch.length, total)} de ${total} fotos...`
+        );
+
+        await sendBatch({
+          action: 'upload',
+          name: guestName,
+          message: message,
+          files: encodedFiles
+        });
+
+        uploaded += batch.length;
+
+        setStatus(`${uploaded} de ${total} fotos enviadas.`);
+      }
+
+      selectedFiles = [];
+
+      renderPreviews();
+
+      form.reset();
+
+      setStatus(
+        `Pronto! ${uploaded} foto(s) foram enviadas em privado para Gleice e Júlio. Obrigado! ♥`
+      );
+
+    } catch (error) {
+      console.error('Erro no envio:', error);
+
+      setStatus(
+        `${uploaded} foto(s) confirmadas. O restante não foi confirmado. ${error.message} Confira o Drive antes de tentar novamente.`,
+        true
+      );
+
+    } finally {
+      uploading = false;
+
+      galleryButton.disabled = false;
+      cameraButton.disabled = false;
+      submitButton.disabled = false;
+      clearButton.disabled = false;
+
+      galleryInput.disabled = false;
+      cameraInput.disabled = false;
+    }
+  });
+
+  // ==================================================
+  // INICIALIZAÇÃO
+  // ==================================================
+
+  renderPreviews();
+
+  setStatus(
+    'Escolha fotos da galeria ou tire uma foto.'
+  );
+
+})();
+        nput');
       field.type = 'hidden';
       field.name = 'payload';
       field.value = JSON.stringify(payload);
