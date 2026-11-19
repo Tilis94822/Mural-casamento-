@@ -43,7 +43,12 @@
           <span class="camera-icon" aria-hidden="true">＋</span>
           <span><strong>Escolher uma foto</strong><small>JPG, PNG ou imagem do celular</small></span>
         </label>
-        <input id="inputFoto" type="file" accept="image/*" capture="environment" required>
+        <input
+  id="inputFoto"
+  type="file"
+  accept="image/*"
+  multiple
+>
         <div id="previewArea" class="preview-area" hidden>
           <img id="previewFoto" alt="Prévia da foto escolhida">
           <button type="button" id="removerFoto" class="remove-photo">Remover foto</button>
