@@ -1,318 +1,288 @@
 
-// Mural de fotos - Gleice e Júlio
-// Seleção de várias fotos + câmera + compressão no navegador.
-// ATENÇÃO: esta versão ainda salva no navegador (localStorage), não no Google Drive.
+// Mural Gleice & Júlio — envio privado para o Google Drive.
+// Até 50 fotos por envio, transmitidas em lotes de 5.
 
-const formFoto = document.getElementById('formFoto');
-const inputFoto = document.getElementById('inputFoto');
-const nomeConvidado = document.getElementById('nomeConvidado');
-const mensagemConvidado = document.getElementById('mensagemConvidado');
-const previewArea = document.getElementById('previewArea');
-const previewFoto = document.getElementById('previewFoto');
-const removerFoto = document.getElementById('removerFoto');
-const mural = document.getElementById('gradeFotos');
-const statusEnvio = document.getElementById('statusEnvio');
-const modalFoto = document.getElementById('modalFoto');
-const imagemExpandida = document.getElementById('imagemExpandida');
-const autorExpandido = document.getElementById('autorExpandido');
-const recadoExpandido = document.getElementById('recadoExpandido');
-const btnFecharModal = document.getElementById('btnFecharModal');
+(() => {
+  'use strict';
 
-let fotosSelecionadas = [];
-let urlsPreview = [];
-const STORAGE_KEY = 'gleice-julio-mural-v1';
-const TAMANHO_MAXIMO_ORIGINAL = 15 * 1024 * 1024;
-const MAX_FOTOS_POR_ENVIO = 5;
-const LADO_MAXIMO = 1280;
-const QUALIDADE_JPEG = 0.70;
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5mLQhSGBeSvz6Ad6VPHaE0tFM75saawEB4QDqdki--CXge0fwWZvYgCc8urU88ugF/exec';
+  const MAX_FILES = 50;
+  const BATCH_SIZE = 5;
+  const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024;
+  const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024;
+  const MAX_SIDE = 1600;
+  const JPEG_QUALITY = 0.72;
 
-function lerFotos() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch (erro) {
-    return [];
-  }
-}
+  const $ = (id) => document.getElementById(id);
+  const form = $('formFoto');
+  const fileInput = $('inputFoto');
+  const nameInput = $('nomeConvidado');
+  const messageInput = $('mensagemConvidado');
+  const previewArea = $('previewArea');
+  const oldPreview = $('previewFoto');
+  const clearButton = $('removerFoto');
+  const status = $('statusEnvio');
+  const mural = $('gradeFotos');
 
-// ----- Seleção de várias fotos -----
-inputFoto.accept = 'image/*';
-inputFoto.multiple = true;
-inputFoto.required = false;
-inputFoto.removeAttribute('required');
-inputFoto.removeAttribute('capture');
-
-// A área antiga de prévia passa a mostrar uma lista de miniaturas.
-if (previewFoto) previewFoto.hidden = true;
-
-const listaPreviews = document.createElement('div');
-listaPreviews.id = 'listaPreviewsFotos';
-listaPreviews.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;width:100%;';
-previewArea.appendChild(listaPreviews);
-
-function atualizarPreviews() {
-  urlsPreview.forEach((url) => URL.revokeObjectURL(url));
-  urlsPreview = [];
-  listaPreviews.innerHTML = '';
-
-  if (fotosSelecionadas.length === 0) {
-    previewArea.hidden = true;
+  if (!form || !fileInput || !nameInput || !messageInput || !previewArea || !clearButton || !status || !mural) {
+    console.error('O HTML do mural não contém todos os elementos esperados.');
     return;
   }
 
-  previewArea.hidden = false;
+  let selectedFiles = [];
+  let previewUrls = [];
+  let busy = false;
+  let activeRequestId = null;
+  let timeoutHandle = null;
 
-  fotosSelecionadas.forEach((arquivo, indice) => {
-    const url = URL.createObjectURL(arquivo);
-    urlsPreview.push(url);
+  // O mural não lista arquivos de ninguém. Mostra apenas instrução de privacidade.
+  mural.innerHTML = '<div class="empty-state"><span aria-hidden="true">♡</span><h3>Suas lembranças são privadas</h3><p>Somente Gleice e Júlio terão acesso às fotos enviadas.</p></div>';
+  const privacyNote = form.querySelector('.privacy-note');
+  if (privacyNote) privacyNote.textContent = 'Suas fotos serão enviadas em privado para Gleice e Júlio. Outros convidados não poderão vê-las.';
+  const submitButton = form.querySelector('[type="submit"]');
+  if (submitButton) submitButton.innerHTML = 'Enviar fotos <span aria-hidden="true">♡</span>';
 
-    const item = document.createElement('div');
-    item.style.cssText = 'position:relative;min-width:0;';
+  fileInput.multiple = true;
+  fileInput.required = false;
+  fileInput.removeAttribute('required');
+  fileInput.removeAttribute('capture');
+  fileInput.accept = 'image/jpeg,image/png,image/webp,image/*';
+  if (oldPreview) oldPreview.hidden = true;
 
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = `Foto ${indice + 1} selecionada`;
-    img.style.cssText = 'width:100%;height:90px;object-fit:cover;border-radius:8px;display:block;';
+  const previewList = document.createElement('div');
+  previewList.id = 'listaPreviewsFotos';
+  previewList.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:9px;width:100%;';
+  previewArea.appendChild(previewList);
 
-    const legenda = document.createElement('small');
-    legenda.textContent = `Foto ${indice + 1}`;
-    legenda.style.cssText = 'display:block;text-align:center;margin-top:4px;';
+  const counter = document.createElement('p');
+  counter.id = 'contadorFotos';
+  counter.className = 'status';
+  previewArea.appendChild(counter);
 
-    item.append(img, legenda);
-    listaPreviews.appendChild(item);
+  // Botão separado para câmera: cada foto tirada entra na seleção existente.
+  const cameraInput = document.createElement('input');
+  cameraInput.type = 'file';
+  cameraInput.accept = 'image/*';
+  cameraInput.capture = 'environment';
+  cameraInput.hidden = true;
+  const cameraButton = document.createElement('button');
+  cameraButton.type = 'button';
+  cameraButton.className = 'remove-photo';
+  cameraButton.textContent = 'Tirar uma foto';
+  cameraButton.style.marginTop = '10px';
+  const pickerLabel = form.querySelector('label[for="inputFoto"]');
+  if (pickerLabel) pickerLabel.insertAdjacentElement('afterend', cameraButton);
+  form.appendChild(cameraInput);
+  cameraButton.addEventListener('click', () => cameraInput.click());
+  cameraInput.addEventListener('change', () => {
+    addFiles(cameraInput.files);
+    cameraInput.value = '';
   });
 
-  statusEnvio.textContent = `${fotosSelecionadas.length} foto(s) selecionada(s). Nome e mensagem serão usados em todas.`;
-}
-
-function adicionarArquivos(arquivos) {
-  const novos = Array.from(arquivos || []);
-  let adicionadas = 0;
-  let ignoradas = 0;
-
-  for (const arquivo of novos) {
-    if (!arquivo.type || !arquivo.type.startsWith('image/')) {
-      ignoradas++;
-      continue;
-    }
-
-    if (arquivo.size > TAMANHO_MAXIMO_ORIGINAL) {
-      ignoradas++;
-      continue;
-    }
-
-    if (fotosSelecionadas.length >= MAX_FOTOS_POR_ENVIO) {
-      ignoradas += novos.length - novos.indexOf(arquivo);
-      break;
-    }
-
-    fotosSelecionadas.push(arquivo);
-    adicionadas++;
+  function setStatus(text, isError = false) {
+    status.textContent = text;
+    status.style.color = isError ? '#a33b32' : '';
   }
 
-  atualizarPreviews();
-
-  if (ignoradas > 0) {
-    statusEnvio.textContent = `${adicionadas} foto(s) adicionada(s). Algumas foram ignoradas: limite de ${MAX_FOTOS_POR_ENVIO} por envio, arquivos não-imagem ou acima de 15 MB.`;
-  } else if (adicionadas > 0) {
-    statusEnvio.textContent = `${fotosSelecionadas.length} foto(s) selecionada(s). Nome e mensagem serão usados em todas.`;
+  function clearPreviews() {
+    previewUrls.forEach(URL.revokeObjectURL);
+    previewUrls = [];
+    previewList.innerHTML = '';
   }
-}
 
-inputFoto.addEventListener('change', () => {
-  adicionarArquivos(inputFoto.files);
-  inputFoto.value = '';
-});
-
-// Botão para abrir a câmera do celular.
-// Cada foto tirada é acrescentada à seleção.
-const inputCamera = document.createElement('input');
-inputCamera.type = 'file';
-inputCamera.accept = 'image/*';
-inputCamera.setAttribute('capture', 'environment');
-inputCamera.hidden = true;
-inputCamera.setAttribute('aria-label', 'Tirar foto com a câmera');
-
-const botaoCamera = document.createElement('button');
-botaoCamera.type = 'button';
-botaoCamera.textContent = 'Tirar foto';
-botaoCamera.className = 'btn-camera';
-botaoCamera.style.cssText = 'display:inline-block;margin:8px 0;padding:10px 16px;border:1px solid #9b7955;border-radius:8px;background:#fffaf3;color:#654b35;font:inherit;cursor:pointer;';
-
-botaoCamera.addEventListener('click', () => inputCamera.click());
-
-inputCamera.addEventListener('change', () => {
-  adicionarArquivos(inputCamera.files);
-  inputCamera.value = '';
-});
-
-const pontoInsercao = inputFoto.closest('label') || inputFoto;
-pontoInsercao.insertAdjacentElement('afterend', inputCamera);
-inputCamera.insertAdjacentElement('afterend', botaoCamera);
-
-// O botão existente agora limpa todas as fotos selecionadas.
-removerFoto.addEventListener('click', () => {
-  fotosSelecionadas = [];
-  inputFoto.value = '';
-  inputCamera.value = '';
-  atualizarPreviews();
-  statusEnvio.textContent = 'Seleção de fotos limpa.';
-});
-
-// ----- Compressão -----
-async function comprimirImagem(file) {
-  let bitmap;
-  let largura;
-  let altura;
-  let desenhar;
-  let limparImagem = () => {};
-
-  if ('createImageBitmap' in window) {
-    bitmap = await createImageBitmap(file);
-    largura = bitmap.width;
-    altura = bitmap.height;
-    desenhar = (ctx, w, h) => ctx.drawImage(bitmap, 0, 0, w, h);
-  } else {
-    const urlTemporaria = URL.createObjectURL(file);
-    limparImagem = () => URL.revokeObjectURL(urlTemporaria);
-
-    const imagem = await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = urlTemporaria;
+  function renderPreviews() {
+    clearPreviews();
+    previewArea.hidden = selectedFiles.length === 0;
+    counter.textContent = selectedFiles.length + ' de ' + MAX_FILES + ' fotos selecionadas';
+    selectedFiles.forEach((file, index) => {
+      const url = URL.createObjectURL(file);
+      previewUrls.push(url);
+      const card = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Prévia da foto ' + (index + 1);
+      img.style.cssText = 'width:100%;height:76px;object-fit:cover;border-radius:8px;display:block;';
+      const label = document.createElement('small');
+      label.textContent = 'Foto ' + (index + 1);
+      label.style.cssText = 'display:block;text-align:center;margin-top:3px;';
+      card.append(img, label);
+      previewList.appendChild(card);
     });
-
-    largura = imagem.naturalWidth;
-    altura = imagem.naturalHeight;
-    desenhar = (ctx, w, h) => ctx.drawImage(imagem, 0, 0, w, h);
   }
 
-  const escala = Math.min(1, LADO_MAXIMO / Math.max(largura, altura));
-  const novaLargura = Math.max(1, Math.round(largura * escala));
-  const novaAltura = Math.max(1, Math.round(altura * escala));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = novaLargura;
-  canvas.height = novaAltura;
-
-  const contexto = canvas.getContext('2d', { alpha: false });
-
-  try {
-    desenhar(contexto, novaLargura, novaAltura);
-
-    return await new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Não foi possível comprimir a imagem.'));
-      }, 'image/jpeg', QUALIDADE_JPEG);
+  function addFiles(fileList) {
+    if (busy) return;
+    let rejected = 0;
+    Array.from(fileList || []).forEach((file) => {
+      if (selectedFiles.length >= MAX_FILES) { rejected++; return; }
+      if (!file.type.startsWith('image/')) { rejected++; return; }
+      if (file.size > MAX_ORIGINAL_BYTES) { rejected++; return; }
+      selectedFiles.push(file);
     });
-  } finally {
-    canvas.width = 1;
-    canvas.height = 1;
-
-    if (bitmap && bitmap.close) bitmap.close();
-    limparImagem();
+    renderPreviews();
+    if (rejected) setStatus('Alguns arquivos foram ignorados. Limite: 50 fotos e 15 MB por foto original.', true);
+    else setStatus(selectedFiles.length ? 'Seleção pronta. Nome e mensagem serão aplicados a todas as fotos.' : 'Escolha suas fotos.');
   }
-}
 
-function blobParaDataURL(blob) {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader();
-    leitor.onload = () => resolve(leitor.result);
-    leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
-    leitor.readAsDataURL(blob);
+  fileInput.addEventListener('change', () => {
+    addFiles(fileInput.files);
+    fileInput.value = '';
   });
-}
 
-// ----- Modal -----
-function abrirModal(foto) {
-  imagemExpandida.src = foto.imagem;
-  autorExpandido.textContent = foto.nome;
-  recadoExpandido.textContent = foto.mensagem || '';
-
-  modalFoto.classList.add('open');
-  modalFoto.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
-}
-
-function fecharModal() {
-  modalFoto.classList.remove('open');
-  modalFoto.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = '';
-  imagemExpandida.src = '';
-}
-
-btnFecharModal.addEventListener('click', fecharModal);
-
-modalFoto.addEventListener('click', (event) => {
-  if (event.target === modalFoto) fecharModal();
-});
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') fecharModal();
-});
-
-// ----- Mural -----
-function renderizarMural() {
-  const fotos = lerFotos();
-  mural.innerHTML = '';
-
-  if (!fotos.length) {
-    mural.innerHTML = '<div class="empty-state"><span aria-hidden="true">✿</span><h3>A primeira lembrança pode ser sua!</h3><p>Envie uma foto para começar a montar nosso mural.</p></div>';
-    return;
-  }
-
-  fotos.slice().reverse().forEach((foto) => {
-    const card = document.createElement('article');
-    card.className = 'photo-card';
-
-    const img = document.createElement('img');
-    img.src = foto.imagem;
-    img.alt = `Foto compartilhada por ${foto.nome}`;
-    img.loading = 'lazy';
-    img.addEventListener('click', () => abrirModal(foto));
-
-    const nome = document.createElement('p');
-    nome.className = 'photo-name';
-    nome.textContent = foto.nome;
-
-    card.append(img, nome);
-
-    if (foto.mensagem) {
-      const mensagem = document.createElement('p');
-      mensagem.className = 'photo-message';
-      mensagem.textContent = foto.mensagem;
-      card.append(mensagem);
+  clearButton.textContent = 'Remover todas as fotos';
+  clearButton.addEventListener('click', () => {
+    if (busy) return;
+    selectedFiles = [];
+    renderPreviews();
+    setStatus('Seleção limpa.');
+  });
+  
+  async function compressImage(file) {
+    let source;
+    let width;
+    let height;
+    let release = () => {};
+    if ('createImageBitmap' in window) {
+      source = await createImageBitmap(file);
+      width = source.width;
+      height = source.height;
+      release = () => source.close && source.close();
+    } else {
+      const url = URL.createObjectURL(file);
+      source = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = url;
+      });
+      width = source.naturalWidth;
+      height = source.naturalHeight;
+      release = () => URL.revokeObjectURL(url);
     }
 
-    mural.append(card);
-  });
-}
-
-// ----- Envio em lote -----
-formFoto.addEventListener('submit', async (event) => {
-  event.preventDefault();
-
-  const nome = nomeConvidado.value.trim();
-  const mensagem = mensagemConvidado.value.trim();
-
-  if (!nome || fotosSelecionadas.length === 0) {
-    statusEnvio.textContent = 'Preencha seu nome e selecione pelo menos uma foto.';
-    return;
+    const scale = Math.min(1, MAX_SIDE / Math.max(width, height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    try {
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      let quality = JPEG_QUALITY;
+      let blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      while (blob && blob.size > MAX_COMPRESSED_BYTES && quality > 0.42) {
+        quality -= 0.08;
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      }
+      if (!blob || blob.size > MAX_COMPRESSED_BYTES) throw new Error('Uma foto não pôde ser reduzida para menos de 2 MB. Escolha uma imagem menor.');
+      return blob;
+    } finally {
+      canvas.width = 1;
+      canvas.height = 1;
+      release();
+    }
   }
 
-  const botaoEnviar = formFoto.querySelector('[type="submit"]');
-  if (botaoEnviar) botaoEnviar.disabled = true;
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = () => reject(new Error('Falha ao preparar uma foto.'));
+      reader.readAsDataURL(blob);
+    });
+  }
 
-  try {
-    const fotosSalvas = lerFotos();
-    const novasFotos = [];
+  function sendBatch(payload) {
+    return new Promise((resolve, reject) => {
+      const requestId = 'gj-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      activeRequestId = requestId;
+      const frameName = 'gj_upload_frame';
+      let frame = document.querySelector('iframe[name="' + frameName + '"]');
+      if (!frame) {
+        frame = document.createElement('iframe');
+        frame.name = frameName;
+        frame.style.display = 'none';
+        document.body.appendChild(frame);
+      }
+      const formTransport = document.createElement('form');
+      formTransport.method = 'POST';
+      formTransport.action = WEB_APP_URL;
+      formTransport.target = frameName;
+      formTransport.style.display = 'none';
+      const field = document.createElement('input');
+      field.type = 'hidden';
+      field.name = 'payload';
+      field.value = JSON.stringify(payload);
+      formTransport.appendChild(field);
+      document.body.appendChild(formTransport);
 
-    for (let i = 0; i < fotosSelecionadas.length; i++) {
-      statusEnvio.textContent = `Preparando foto ${i + 1} de ${fotosSelecionadas.length}...`;
+      const onMessage = (event) => {
+        if (event.source !== frame.contentWindow || !event.data || event.data.type !== 'gj-upload-result') return;
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timeoutHandle);
+        formTransport.remove();
+        if (event.data.result && event.data.result.ok) resolve(event.data.result);
+        else reject(new Error(event.data.result && event.data.result.error || 'O servidor não conseguiu salvar este lote.'));
+      };
+      window.addEventListener('message', onMessage);
+      timeoutHandle = setTimeout(() => {
+        window.removeEventListener('message', onMessage);
+        formTransport.remove();
+        reject(new Error('O servidor demorou para responder. Verifique a implantação do Apps Script e tente novamente.'));
+      }, 90000);
+      formTransport.submit();
+    });
+  }
 
-      const comprimida = await comprimirImagem(fotosSelecionadas[i]);
-      const imagem = await blobParaDataURL(comprimida);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    const guestName = nameInput.value.trim();
+    const message = messageInput.value.trim();
+    if (!guestName) { setStatus('Informe seu nome.', true); nameInput.focus(); return; }
+    if (!selectedFiles.length) { setStatus('Selecione pelo menos uma foto.', true); return; }
+
+    busy = true;
+    if (submitButton) submitButton.disabled = true;
+    cameraButton.disabled = true;
+    clearButton.disabled = true;
+    fileInput.disabled = true;
+    let uploaded = 0;
+
+    try {
+      const total = selectedFiles.length;
+      for (let start = 0; start < total; start += BATCH_SIZE) {
+        const batchFiles = selectedFiles.slice(start, start + BATCH_SIZE);
+        const encoded = [];
+        for (let i = 0; i < batchFiles.length; i++) {
+          setStatus('Preparando foto ' + (start + i + 1) + ' de ' + total + '...');
+          const blob = await compressImage(batchFiles[i]);
+          encoded.push({ mimeType: 'image/jpeg', base64: await blobToBase64(blob) });
+        }
+        setStatus('Enviando ' + Math.min(start + batchFiles.length, total) + ' de ' + total + ' fotos...');
+        await sendBatch({ action: 'upload', name: guestName, message, files: encoded });
+        uploaded += batchFiles.length;
+        setStatus(uploaded + ' de ' + total + ' fotos enviadas.');
+      }
+
+      selectedFiles = [];
+      renderPreviews();
+      form.reset();
+      setStatus('Pronto! ' + uploaded + ' foto(s) foram enviadas em privado para Gleice e Júlio. Obrigado! ♥');
+    } catch (error) {
+      console.error(error);
+      setStatus(uploaded + ' foto(s) enviadas. O restante não foi confirmado: ' + error.message + ' Não selecione tudo novamente sem conferir o Drive.', true);
+    } finally {
+      busy = false;
+      if (submitButton) submitButton.disabled = false;
+      cameraButton.disabled = false;
+      clearButton.disabled = false;
+      fileInput.disabled = false;
+    }
+  });
+
+  renderPreviews();
+})();
+        aURL(comprimida);
 
       novasFotos.push({
         id: `${Date.now()}-${i}-${Math.random().toString(16).slice(2)}`,
