@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx5mLQhSGBeSvz6Ad6VPHaE0tFM75saawEB4QDqdki--CXge0fwWZvYgCc8urU88ugF/exec';
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzeQJ-HCToW9tJw62YDSYL1oeZyxxzpxbg9KYqpp8GHsTa9CJ9o_fuvYjH48QW3W2PccA/exec';
   const MAX_FILES = 50;
   const BATCH_SIZE = 5;
   const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024;
