@@ -3,7 +3,7 @@
 
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzeQJ-HCToW9tJw62YDSYL1oeZyxxzpxbg9KYqpp8GHsTa9CJ9o_fuvYjH48QW3W2PccA/exec';
   const MAX_FILES = 50;
-  const BATCH_SIZE = 1; // Um arquivo por requisição reduz falhas por tamanho/tempo.
+  const BATCH_SIZE = 1;
   const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024;
   const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024;
   const MAX_SIDE = 1600;
@@ -257,23 +257,53 @@
       const field = document.createElement('input');
       field.type = 'hidden';
       field.name = 'payload';
-      field.value = JSON.stringify({ action: 'upload', name: record.name, message: record.message,
-        files: [{ photoId: record.id, mimeType: 'image/jpeg', base64 }] });
+      field.value = JSON.stringify({
+        action: 'upload',
+        name: record.name,
+        message: record.message,
+        files: [{
+          photoId: record.id,
+          mimeType: 'image/jpeg',
+          base64
+        }]
+      });
       transport.appendChild(field);
       document.body.append(frame, transport);
       let finished = false;
       let timer;
-      const cleanup = () => { window.removeEventListener('message', onMessage); clearTimeout(timer); frame.remove(); transport.remove(); };
-      const finish = (error, result) => { if (finished) return; finished = true; cleanup(); error ? reject(error) : resolve(result); };
+
+      const cleanup = () => {
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timer);
+        frame.remove();
+        transport.remove();
+      };
+
+      const finish = (error, result) => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        error ? reject(error) : resolve(result);
+      };
+
       const onMessage = event => {
         if (event.source !== frame.contentWindow || !event.data || event.data.type !== 'gj-upload-result') return;
         const result = event.data.result;
         if (result && result.ok) finish(null, result);
         else finish(new Error(result && result.error ? result.error : 'O Drive não confirmou o envio.'));
       };
+
       window.addEventListener('message', onMessage);
-      timer = setTimeout(() => finish(new Error('Tempo de espera esgotado. A foto continuará salva e poderá ser reenviada.')), 120000);
-      try { transport.submit(); } catch (error) { finish(error); }
+      timer = setTimeout(
+        () => finish(new Error('Tempo de espera esgotado. A foto continuará salva e poderá ser reenviada.')),
+        120000
+      );
+
+      try {
+        transport.submit();
+      } catch (error) {
+        finish(error);
+      }
     });
   }
 
@@ -283,10 +313,13 @@
     try {
       let pending = await queueAll();
       if (!pending.length) return;
+
       setStatus(`Conexão disponível. Enviando ${pending.length} foto(s) que estavam guardadas...`);
       let sent = 0;
+
       for (const record of pending) {
         if (!navigator.onLine) throw new Error('A conexão caiu. As fotos continuam salvas neste aparelho.');
+
         setStatus(`Enviando foto ${sent + 1} de ${pending.length}...`);
         await transmitRecord(record);
         await queueDelete(record.id);
@@ -294,6 +327,7 @@
         await updatePendingInfo();
         setStatus(`${sent} de ${pending.length} foto(s) pendentes enviadas.`);
       }
+
       setStatus(`Pronto! ${sent} foto(s) enviadas em privado para Gleice e Júlio. ♥`);
     } catch (error) {
       console.error(error);
@@ -307,36 +341,67 @@
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (busy) return;
+
     const name = nameInput.value.trim();
     const message = messageInput.value.trim();
-    if (!name) { setStatus('Informe seu nome.', true); nameInput.focus(); return; }
-    if (!selectedFiles.length) { setStatus('Escolha pelo menos uma foto da galeria ou tire uma foto.', true); return; }
+
+    if (!name) {
+      setStatus('Informe seu nome.', true);
+      nameInput.focus();
+      return;
+    }
+    if (!selectedFiles.length) {
+      setStatus('Escolha pelo menos uma foto da galeria ou tire uma foto.', true);
+      return;
+    }
 
     busy = true;
     [galleryInput, cameraInput, cameraButton, clearButton, submitButton].forEach(el => el.disabled = true);
+
     const total = selectedFiles.length;
     let saved = 0;
+
     try {
       for (let i = 0; i < total; i++) {
         setStatus(`Preparando e guardando foto ${i + 1} de ${total} neste aparelho...`);
         const blob = await compressImage(selectedFiles[i]);
-        const id = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}-${i}`;
-        await queueAdd({ id, blob, name, message, createdAt: Date.now() + i });
+        const id = (window.crypto && window.crypto.randomUUID)
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}-${i}`;
+
+        await queueAdd({
+          id,
+          blob,
+          name,
+          message,
+          createdAt: Date.now() + i
+        });
+
         saved++;
         await updatePendingInfo();
       }
+
       selectedFiles = [];
       renderPreviews();
       form.reset();
-      setStatus(`${saved} foto(s) guardadas neste aparelho. ${navigator.onLine ? 'Iniciando o envio...' : 'Quando você abrir este site novamente com internet, o envio será retomado.'}`);
+
+      setStatus(
+        `${saved} foto(s) guardadas neste aparelho. ` +
+        `${navigator.onLine ? 'Iniciando o envio...' : 'Quando você abrir este site novamente com internet, o envio será retomado.'}`
+      );
+
       if (navigator.onLine) await syncQueue();
+
     } catch (error) {
       console.error(error);
       if (saved > 0) {
         selectedFiles.splice(0, saved);
         renderPreviews();
       }
-      setStatus(`${saved} foto(s) foram guardadas. ${error.message} Mantenha este navegador e os dados do site no aparelho.`, true);
+      setStatus(
+        `${saved} foto(s) foram guardadas. ${error.message} Mantenha este navegador e os dados do site no aparelho.`,
+        true
+      );
     } finally {
       busy = false;
       [galleryInput, cameraInput, cameraButton, clearButton, submitButton].forEach(el => el.disabled = false);
@@ -348,17 +413,26 @@
     setStatus('Internet detectada. Retomando o envio das fotos guardadas...');
     syncQueue();
   });
-  window.addEventListener('pageshow', () => { if (navigator.onLine) syncQueue(); });
+
+  window.addEventListener('pageshow', () => {
+    if (navigator.onLine) syncQueue();
+  });
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js').then(() => navigator.serviceWorker.ready).then(() => {
-        setOfflineInfo('Modo offline preparado neste aparelho. Selecione as fotos mesmo sem internet; o envio será retomado quando abrir o site conectado.');
-      }).catch(error => console.warn('Não foi possível preparar o modo offline:', error));
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(registration => registration.update())
+        .then(() => navigator.serviceWorker.ready)
+        .then(() => {
+          setOfflineInfo('Modo offline preparado neste aparelho. Selecione as fotos mesmo sem internet; o envio será retomado quando abrir o site conectado.');
+        })
+        .catch(error => console.warn('Não foi possível preparar o modo offline:', error));
     });
   }
 
   renderPreviews();
   setStatus('Escolha fotos da galeria ou tire uma foto.');
-  updatePendingInfo().then(() => { if (navigator.onLine) syncQueue(); });
+  updatePendingInfo().then(() => {
+    if (navigator.onLine) syncQueue();
+  });
 })();
