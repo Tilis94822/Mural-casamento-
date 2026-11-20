@@ -4,7 +4,7 @@ e(() => {
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzeQJ-HCToW9tJw62YDSYL1oeZyxxzpxbg9KYqpp8GHsTa9CJ9o_fuvYjH48QW3W2PccA/exec';
 
   const MAX_FILES = 50;
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 20;
   const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024;
   const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024;
   const MAX_SIDE = 1600;
