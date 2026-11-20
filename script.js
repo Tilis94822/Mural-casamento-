@@ -242,71 +242,105 @@
     });
   }
 
-  async function transmitRecord(record) {
-    const base64 = await toBase64(record.blob);
-    return new Promise((resolve, reject) => {
-      const frameName = 'gj_frame_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      const frame = document.createElement('iframe');
-      frame.name = frameName;
-      frame.style.display = 'none';
-      const transport = document.createElement('form');
-      transport.method = 'POST';
-      transport.action = WEB_APP_URL;
-      transport.target = frameName;
-      transport.style.display = 'none';
-      const field = document.createElement('input');
-      field.type = 'hidden';
-      field.name = 'payload';
-      field.value = JSON.stringify({
-        action: 'upload',
-        name: record.name,
-        message: record.message,
-        files: [{
-          photoId: record.id,
-          mimeType: 'image/jpeg',
-          base64
-        }]
-      });
-      transport.appendChild(field);
-      document.body.append(frame, transport);
-      let finished = false;
-      let timer;
+        async function transmitRecord(record) {
+  const base64 = await toBase64(record.blob);
 
-      const cleanup = () => {
-        window.removeEventListener('message', onMessage);
-        clearTimeout(timer);
-        frame.remove();
-        transport.remove();
-      };
+  const requestId = (window.crypto && window.crypto.randomUUID)
+    ? window.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      const finish = (error, result) => {
-        if (finished) return;
-        finished = true;
-        cleanup();
-        error ? reject(error) : resolve(result);
-      };
+  return new Promise((resolve, reject) => {
+    const frameName = 'gj_frame_' + requestId.replace(/-/g, '');
+    const frame = document.createElement('iframe');
 
-      const onMessage = event => {
-        if (event.source !== frame.contentWindow || !event.data || event.data.type !== 'gj-upload-result') return;
-        const result = event.data.result;
-        if (result && result.ok) finish(null, result);
-        else finish(new Error(result && result.error ? result.error : 'O Drive não confirmou o envio.'));
-      };
+    frame.name = frameName;
+    frame.style.display = 'none';
 
-      window.addEventListener('message', onMessage);
-      timer = setTimeout(
-        () => finish(new Error('Tempo de espera esgotado. A foto continuará salva e poderá ser reenviada.')),
-        120000
-      );
+    const transport = document.createElement('form');
+    transport.method = 'POST';
+    transport.action = WEB_APP_URL;
+    transport.target = frameName;
+    transport.style.display = 'none';
 
-      try {
-        transport.submit();
-      } catch (error) {
-        finish(error);
-      }
+    const field = document.createElement('input');
+    field.type = 'hidden';
+    field.name = 'payload';
+
+    field.value = JSON.stringify({
+      action: 'upload',
+      requestId: requestId,
+      name: record.name,
+      message: record.message,
+      files: [{
+        photoId: record.id,
+        mimeType: 'image/jpeg',
+        base64: base64
+      }]
     });
-  }
 
+    transport.appendChild(field);
+    document.body.append(frame, transport);
+
+    let finished = false;
+    let timer;
+
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+      frame.remove();
+      transport.remove();
+    };
+
+    const finish = (error, result) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+
+      if (error) reject(error);
+      else resolve(result);
+    };
+
+    const onMessage = event => {
+      if (!event.data ||
+          event.data.type !== 'gj-upload-result' ||
+          event.data.requestId !== requestId) {
+        return;
+      }
+
+      const trustedOrigin =
+        event.origin === 'https://script.google.com' ||
+        /^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(event.origin);
+
+      if (!trustedOrigin) return;
+
+      const result = event.data.result;
+
+      if (result && result.ok) {
+        finish(null, result);
+      } else {
+        finish(new Error(
+          result && result.error
+            ? result.error
+            : 'O Drive não confirmou o envio.'
+        ));
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+
+    timer = setTimeout(() => {
+      finish(new Error(
+        'Tempo de espera esgotado. A foto continua guardada neste aparelho.'
+      ));
+    }, 120000);
+
+    try {
+      transport.submit();
+    } catch (error) {
+      finish(error);
+    }
+  });
+        }
   async function syncQueue() {
     if (syncRunning || !navigator.onLine) return;
     syncRunning = true;
