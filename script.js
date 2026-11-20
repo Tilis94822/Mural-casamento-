@@ -1,4 +1,4 @@
-(() => {
+e(() => {
   'use strict';
 
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzeQJ-HCToW9tJw62YDSYL1oeZyxxzpxbg9KYqpp8GHsTa9CJ9o_fuvYjH48QW3W2PccA/exec';
@@ -330,13 +330,14 @@
           return;
         }
 
-        const trustedOrigin =
-          event.origin === 'https://script.google.com' ||
-          /^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(
-            event.origin
-          );
+const trustedOrigin =
+  event.origin === 'null' ||
+  event.origin === 'https://script.google.com' ||
+  /^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(
+    event.origin
+  );
 
-        if (!trustedOrigin) return;
+if (!trustedOrigin) return;
 
         const result = event.data.result;
 
