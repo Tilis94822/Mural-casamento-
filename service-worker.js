@@ -2,7 +2,7 @@
 
 // Troque a versão quando atualizar os arquivos do site.
 // Isso força a instalação de um novo cache sem apagar a fila do IndexedDB.
-const CACHE_NAME = 'mural-gj-offline-v2';
+const CACHE_NAME = 'mural-gj-offline-v3';
 
 const APP_FILES = [
   './',
